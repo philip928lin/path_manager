@@ -13,7 +13,7 @@
 pip install PathNavigator
 ```
 
-Install the latest version from GitHub repo:
+Install the latest version from the GitHub repo:
 ```bash
 pip install git+https://github.com/philip928lin/PathNavigator.git
 ```
