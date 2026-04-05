@@ -1,7 +1,15 @@
+"""
+Core Folder class for PathNavigator.
+
+Provides attribute-style access to filesystem directories, lazy on-demand
+scanning, and common directory operations such as mkdir, remove, chdir,
+path joining, and tree rendering.
+"""
+
 import os
 import sys
 import shutil
-from itertools import tee, islice
+from itertools import islice
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, Any
@@ -10,44 +18,6 @@ from .att_name_convertor import AttributeNameConverter
 from .utils import Base
 
 __all__ = ['Folder']
-
-"""
-    Methods
-    -------
-    __getattr__(item)
-        Allows access to subfolders and files as attributes. Replaces '_' with spaces.
-    scan(max_depth=1, only_include=None, only_exclude=None,
-        only_folders=False, only_files=False, clear=True,
-        max_files=sys.maxsize, max_folders=sys.maxsize,
-        recursive_include_and_exclude=True, include_hidden=False, _depth_count=0)
-        Recursively scans subfolders and files in the current folder.
-    ls()
-        Prints the contents (subfolders and files) of the folder.
-    get()
-        Get the full path of a file in the current folder.
-    get_str()
-        Get the full path str of a file in the current folder.
-    join(*args)
-        Joins the current folder path with additional path components.
-    set_sc(name, filename=None)
-        Adds a shortcut to this folder (or file) using the Shortcut manager.
-    remove(name)
-        Removes a file or subfolder from the folder and deletes it from the filesystem.
-    mkdir(*args)
-        Creates a subdirectory in the current folder and updates the internal structure.
-    exists(name, scan_before_checking=False)
-        Checks if a file or subfolder exists in the current folder.
-    set_all_files_to_sc(overwrite=False, prefix="")
-        Adds all files in the current folder to the shortcut manager.
-    list(mode='name', type=None)
-        Lists subfolders or files in the current folder based on the specified filters.
-    add_to_sys_path(method='insert', index=1)
-        Adds the directory to the system path.
-    chdir()
-        Sets this directory as the working directory.
-    tree(level=-1, limit_to_directories=False, length_limit=1000, level_length_limit=1000)
-        Prints a visual tree structure of the folder and its contents.
-"""
 
 @dataclass
 class Folder(Base):
@@ -107,12 +77,6 @@ class Folder(Base):
         >>> folder.file1
         '/path/to/file1'
         """
-        #folder_name = item.replace('_', ' ')
-        #if folder_name in self.subfolders:
-        #    return self.subfolders[folder_name]
-        #elif item in self.subfolders:
-        #    return self.subfolders[item]
-
         if item in self.subfolders:
             return self.subfolders[item]
         elif item in self.files:
@@ -129,34 +93,87 @@ class Folder(Base):
         raise AttributeError(f"'{item}' not found in the attributes of '{self.name}' folder. "
                 f"Please try to access '{item}' through the `get()` method if '{item}' exists in '{self.name}' folder in the file system.")
     
-    def _split_entries_lazy(self, p: Path, include_hidden=False, only_include=[], only_exclude=[]):
-        def filtered_entries():
-            with os.scandir(p) as entries:
-                for entry in entries:
-                    name = entry.name
-                    if not include_hidden and name.startswith('.'):
-                        continue
-                    if only_include and not any(fnmatch.fnmatch(name, pat) for pat in only_include):
-                        continue
-                    if only_exclude and any(fnmatch.fnmatch(name, pat) for pat in only_exclude):
-                        continue
-                    yield entry
+    @staticmethod
+    def _is_hidden(entry) -> bool:
+        """
+        Return True if *entry* should be treated as hidden.
 
-        entries1, entries2 = tee(filtered_entries())
+        On all platforms, names starting with ``'.'`` are considered hidden
+        (Unix convention, also used for dot-files on Windows such as ``.git``).
+        On Windows, entries with the ``FILE_ATTRIBUTE_HIDDEN`` bit set are
+        additionally considered hidden, covering system files like
+        ``Thumbs.db`` and ``desktop.ini``.
 
-        folders = (Path(e.path) for e in entries1 if e.is_dir(follow_symlinks=False))
-        files = (Path(e.path) for e in entries2 if e.is_file(follow_symlinks=False))
+        Parameters
+        ----------
+        entry : os.DirEntry
+            A directory entry returned by ``os.scandir``.
 
+        Returns
+        -------
+        bool
+        """
+        if entry.name.startswith('.'):
+            return True
+        if os.name == 'nt':
+            try:
+                import ctypes
+                attrs = ctypes.windll.kernel32.GetFileAttributesW(entry.path)
+                # FILE_ATTRIBUTE_HIDDEN = 0x2; GetFileAttributesW returns -1 on error
+                return attrs != -1 and bool(attrs & 2)
+            except Exception:
+                pass
+        return False
+
+    def _split_entries(self, p: Path, include_hidden: bool = False,
+                       only_include: list = None, only_exclude: list = None):
+        """
+        Scan directory *p* in a single pass and return separate lists of
+        subdirectory paths and file paths after applying optional filters.
+
+        Parameters
+        ----------
+        p : Path
+            The directory to scan.
+        include_hidden : bool, optional
+            Include hidden entries (dot-files on Unix/macOS; dot-files and
+            FILE_ATTRIBUTE_HIDDEN entries on Windows). Default is False.
+        only_include : list or None, optional
+            Glob patterns; only entries matching at least one pattern are kept.
+            ``None`` (default) disables this filter.
+        only_exclude : list or None, optional
+            Glob patterns; entries matching any pattern are dropped.
+            ``None`` (default) disables this filter.
+
+        Returns
+        -------
+        tuple[list[Path], list[Path]]
+            A pair ``(folders, files)`` of Path lists for directories and files.
+        """
+        folders = []
+        files = []
+        with os.scandir(p) as it:
+            for entry in it:
+                name = entry.name
+                if not include_hidden and self._is_hidden(entry):
+                    continue
+                if only_include and not any(fnmatch.fnmatch(name, pat) for pat in only_include):
+                    continue
+                if only_exclude and any(fnmatch.fnmatch(name, pat) for pat in only_exclude):
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    folders.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    files.append(Path(entry.path))
         return folders, files
 
-    def scan(self, max_depth: int = 1, 
+    def scan(self, max_depth: int = 1,
              only_include: list = None, only_exclude: list = None,
              only_folders: bool = False, only_files: bool = False,
              clear: bool = True,
              max_files: int = sys.maxsize, max_folders: int = sys.maxsize,
              recursive_include_and_exclude: bool = True,
-             include_hidden: bool = False,
-             _depth_count: int = 0):
+             include_hidden: bool = False):
         """
         Recursively scan subfolders and files in the current folder.
 
@@ -164,60 +181,85 @@ class Folder(Base):
         ----------
         max_depth : int, optional
             The maximum depth to scan. Default is 1.
-        only_include : list, optional
-            A list of  patterns to include only files or folders that match the patterns.
-            No `**` wildcard is allowed, only `*` is allowed.
-        only_exclude : list, optional
-            A list of patterns to exclude files or folders that match the patterns.
-            No `**` wildcard is allowed, only `*` is allowed.
+        only_include : list or None, optional
+            Glob patterns (``*`` and ``?`` only, no ``**``) to include matching
+            entries. ``None`` (default) includes everything.
+        only_exclude : list or None, optional
+            Glob patterns to exclude matching entries. ``None`` (default)
+            excludes nothing. Applied after ``only_include``.
         only_folders : bool, optional
-            Whether to scan only subfolders. Default is False.
+            Scan only subdirectories, skip files. Default is False.
         only_files : bool, optional
-            Whether to scan only files. Default is False.
+            Scan only files, skip subdirectories. Default is False.
         clear : bool, optional
-            Whether to clear the subfolders and files before scanning. Default is True.
+            Clear existing results before scanning. Set to ``False`` to merge
+            new results into the current state. Default is True.
         max_files : int, optional
-            The maximum number of files at each level to scan. Default is sys.maxsize.
+            Maximum number of files per directory level. Default is sys.maxsize.
         max_folders : int, optional
-            The maximum number of subfolders at each level to scan. Default is sys.maxsize.
+            Maximum number of subdirectories per directory level.
+            Default is sys.maxsize.
         recursive_include_and_exclude : bool, optional
-            Whether to apply the include and exclude patterns recursively. Default is True.
+            Apply ``only_include`` / ``only_exclude`` at every depth level.
+            When ``False``, filters apply only at the top level and deeper
+            levels are scanned without restriction. Default is True.
         include_hidden : bool, optional
-            Whether to include hidden files and folders in the scan. Default is False.
-        _depth_count : int, optional
-            The current depth count. Default is 0.
+            Include hidden entries. On Unix/macOS these are dot-files; on
+            Windows these are dot-files *and* entries with the
+            ``FILE_ATTRIBUTE_HIDDEN`` attribute. Default is False.
         """
+        self._scan(
+            max_depth=max_depth,
+            only_include=only_include,
+            only_exclude=only_exclude,
+            only_folders=only_folders,
+            only_files=only_files,
+            clear=clear,
+            max_files=max_files,
+            max_folders=max_folders,
+            recursive_include_and_exclude=recursive_include_and_exclude,
+            include_hidden=include_hidden,
+            _depth_count=0,
+        )
+
+    def _scan(self, max_depth: int = 1,
+              only_include: list = None, only_exclude: list = None,
+              only_folders: bool = False, only_files: bool = False,
+              clear: bool = True,
+              max_files: int = sys.maxsize, max_folders: int = sys.maxsize,
+              recursive_include_and_exclude: bool = True,
+              include_hidden: bool = False,
+              _depth_count: int = 0):
+        """Internal recursive scan implementation. Use ``scan()`` instead."""
         self._pn_current_depth = _depth_count
         if _depth_count >= max_depth:
-            #print(f"Depth limit reached: {max_depth}")
             return None
 
         if clear:
-            # Clear the subfolders and files before scanning
             self.subfolders.clear()
             self.files.clear()
-        # Else, continue scanning from the current state
 
         p = self.get()
-        folders, files = self._split_entries_lazy(
+        folders, files = self._split_entries(
             p,
             include_hidden=include_hidden,
             only_include=only_include,
-            only_exclude=only_exclude
+            only_exclude=only_exclude,
         )
-        
-        if recursive_include_and_exclude is False:
+
+        if not recursive_include_and_exclude:
+            # Filters applied at depth 0 only; clear them for deeper levels
             only_include = None
             only_exclude = None
-        
+
         if not only_files:
             for entry in islice(folders, max_folders):
                 entry_name = entry.name
                 valid_folder_name = self._pn_converter.to_valid_name(entry_name)
-                new_subfolder = Folder(entry_name, parent_path=p, _pn_object=self._pn_object)
+                new_subfolder = Folder(entry_name, parent_path=p,
+                                       _pn_object=self._pn_object)
                 self.subfolders[valid_folder_name] = new_subfolder
-                # Recursively scan subfolders (if max_depth > 1)
-                new_subfolder.scan(
+                new_subfolder._scan(
                     max_depth=max_depth,
                     only_include=only_include,
                     only_exclude=only_exclude,
@@ -227,9 +269,9 @@ class Folder(Base):
                     max_files=max_files,
                     max_folders=max_folders,
                     include_hidden=include_hidden,
-                    _depth_count=_depth_count + 1
-                    )
-            
+                    _depth_count=_depth_count + 1,
+                )
+
         if not only_folders:
             for entry in islice(files, max_files):
                 entry_name = entry.name
@@ -374,7 +416,7 @@ class Folder(Base):
 
         # Rescan the folder structure after creating a new subfolder
         parts = full_path.relative_to(self.get()).parts
-        # if same folder name occurs in different folder levels, the following scen will 
+        # if same folder name occurs in different folder levels, the following scan will
         # go through them as well. We keep this design for simplicity.
         self.scan(max_depth=len(parts), only_include=parts, clear=False)
 
@@ -432,8 +474,8 @@ class Folder(Base):
                     "Try to `scan()` if the file exists in the file system."
                 ) from e
 
-    def set_all_to_sc(self, overwrite: bool = False, prefix: str = "", 
-                only_include: list = [], only_exclude: list = [],
+    def set_all_to_sc(self, overwrite: bool = False, prefix: str = "",
+                only_include: list = None, only_exclude: list = None,
                 only_folders: bool = False, only_files: bool = False):
         """
         Add all files in the current folder to the shortcut manager.
@@ -483,7 +525,7 @@ class Folder(Base):
         # Otherwise, process the parts in args
         path = Path(*args)
         parts = path.parts
-        # if same folder name occurs in different folder levels, the following scen will 
+        # if same folder name occurs in different folder levels, the following scan will
         # go through them as well. We keep this design for simplicity.
         self.scan(max_depth=len(parts), only_include=parts, clear=False)
         
@@ -492,13 +534,13 @@ class Folder(Base):
             valid_name = self._pn_converter.to_valid_name(part)
             if i == len(path.parts) - 1:
                 if valid_name not in current_obj.files and valid_name not in current_obj.subfolders:
-                    raise ValueError(
+                    raise FileNotFoundError(
                         f"'{path}' not found in '{Path(self.parent_path) / self.name}'."
                         )
                 return Path(current_obj.parent_path) / current_obj.name / part
             else:
                 if valid_name not in current_obj.subfolders:
-                    raise ValueError(
+                    raise FileNotFoundError(
                         f"'{part}' not found in '{Path(current_obj.parent_path) / current_obj.name}'."
                         )
                 current_obj = current_obj.subfolders[valid_name]
@@ -509,9 +551,9 @@ class Folder(Base):
 
         Parameters
         ----------
-        fname : str
-            The name of the file or the subfolder to get. If None, returns the full path
-            of the folder. Default is None.
+        *args : str
+            The name of the file or the subfolder to get. If not provided,
+            returns the full path of the current folder.
 
         Returns
         -------
@@ -526,7 +568,7 @@ class Folder(Base):
         """
         return str(self.get(*args))
 
-    def list(self, mode='name', type=None):
+    def list(self, mode='name', entry_type=None):
         """
         List subfolders or files in the current folder.
 
@@ -537,11 +579,11 @@ class Folder(Base):
             - 'name': List item names (with extensions for files).
             - 'dir': List full item paths.
             - 'stem': List file stems (filenames without extensions).
-        type : str, optional
-            The type of items to list. Options are:
-            - 'folder': List only folders.
-            - 'file': List only files.
-            - None (default): List both files and directories.
+        entry_type : str or None, optional
+            Filter items by kind:
+            - ``'folder'``: return only directories.
+            - ``'file'``: return only files.
+            - ``None`` (default): return both files and directories.
 
         Returns
         -------
@@ -554,12 +596,12 @@ class Folder(Base):
             'stem': lambda item: item.stem
         }
 
-        items = self.get().iterdir()  # Get all items in the folder
+        items = self.get().iterdir()
 
-        if type == 'folder':
-            items = (item for item in items if item.is_dir())  # Filter only directories
-        elif type == 'file':
-            items = (item for item in items if item.is_file())  # Filter only files
+        if entry_type == 'folder':
+            items = (item for item in items if item.is_dir())
+        elif entry_type == 'file':
+            items = (item for item in items if item.is_file())
 
         return [mode_map[mode](item) for item in items]
 
@@ -605,11 +647,13 @@ class Folder(Base):
         >>> folder.add_to_sys_path(method='invalid')
         Invalid method: invalid. Use 'insert' or 'append'.
         """
-        if self.get() not in sys.path:
+        # sys.path must contain strings, not Path objects
+        path_str = str(self.get())
+        if path_str not in sys.path:
             if method == 'insert':
-                sys.path.insert(index, self.get())
+                sys.path.insert(index, path_str)
             elif method == 'append':
-                sys.path.append(self.get())
+                sys.path.append(path_str)
             else:
                 raise ValueError(f"Invalid method: {method}. Use 'insert' or 'append'.")
         if self._pn_object._pn_display:
@@ -664,7 +708,7 @@ class Folder(Base):
                 file_pointers = [tee] * (len(folder.files) - 1) + [last]
                 for i, (pointer, filepath) in enumerate(zip(file_pointers, folder.files.values())):
                     if i == level_length_limit:
-                        yield prefix + pointer + "...limit reached (total: {len(folder.files)} files)"
+                        yield prefix + pointer + f"...limit reached (total: {len(folder.files)} files)"
                     elif i > level_length_limit:
                         pass
                     else:

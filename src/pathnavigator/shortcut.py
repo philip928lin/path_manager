@@ -1,3 +1,10 @@
+"""
+Shortcut manager for PathNavigator.
+
+Provides the Shortcut class, which stores named path bookmarks as dynamic
+attributes. Shortcuts can be serialized to / loaded from JSON and YAML.
+"""
+
 import json
 import yaml
 from dataclasses import dataclass, field
@@ -7,39 +14,6 @@ from .att_name_convertor import AttributeNameConverter
 from .utils import Base
 
 __all__ = ['Shortcut']
-
-"""
-    Methods
-    -------
-    add(name, path, overwrite=False)
-        Adds a new shortcut as an attribute. 
-    add_all(directory, overwrite=False, prefix="",
-                only_include=[], only_exclude=[],
-                only_folders=False, only_files=False)
-        Adds all files in a given directory as shortcuts.
-    get(name)
-        Retrieves the path of a shortcut.
-    get_str(name)
-        Retrieves the path of a shortcut as a string.
-    remove(name)
-        Removes an existing shortcut by name and deletes the attribute.
-    clear()
-        Removes all shortcuts.
-    ls()
-        Lists all shortcuts (attributes).
-    to_dict()
-        Returns all shortcuts as a dictionary.
-    to_json(filename)
-        Returns all shortcuts as a JSON string and saves it to a file.
-    to_yaml(filename)
-        Returns all shortcuts as a YAML string and saves it to a file.
-    load_dict(data, overwrite=False)
-        Loads shortcuts from a dictionary.
-    load_json(filename, overwrite=False)
-        Loads shortcuts from a JSON file.
-    load_yaml(filename, overwrite=False)
-        Loads shortcuts from a YAML file.
-"""
 
 @dataclass
 class Shortcut(Base):
@@ -146,54 +120,55 @@ class Shortcut(Base):
         valid_name = self._pn_converter.to_valid_name(name)
         self.__setattr__(valid_name, path, overwrite=overwrite)
 
-    def add_all(self, directory: str|Path, overwrite: bool = False, prefix: str = "", 
-                only_include: list = [], only_exclude: list = [],
+    def add_all(self, directory: str|Path, overwrite: bool = False, prefix: str = "",
+                only_include: list = None, only_exclude: list = None,
                 only_folders: bool = False, only_files: bool = False):
-            """
-            Add all files in a given directory as shortcuts.
+        """
+        Add all entries in a given directory as shortcuts.
 
-            Parameters
-            ----------
-            directory : str or Path
-                The directory containing the files to add as shortcuts.
-            overwrite : bool, optional
-                Whether to overwrite existing shortcuts. Default is False.
-            prefix : str, optional
-                The prefix to add to the shortcut names. Default is "".
-            only_include : list, optional
-                A list of  patterns to include only files or folders that match the patterns.
-                No `**` wildcard is allowed, only `*` is allowed.
-            only_exclude : list, optional
-                A list of patterns to exclude files or folders that match the patterns.
-                No `**` wildcard is allowed, only `*` is allowed.
-            only_folders : bool, optional
-                Whether to scan only subfolders. Default is False.
-            only_files : bool, optional
-                Whether to scan only files. Default is False.
-            Examples
-            --------
-            >>> shortcut = Shortcut()
-            >>> shortcut.add_all("/path/to/directory")
-            """
-            p = Path(directory).absolute()
-            if not p.is_dir():
-                raise NotADirectoryError(f"{directory} is not a valid directory")
-        
-            if only_include != []:
-                generator = chain.from_iterable(p.glob(pattern) for pattern in only_include)
-            elif only_exclude != []:
-                generator = (entry for entry in p.iterdir() if not any(entry.match(pattern) for pattern in only_exclude))
-            else:
-                generator = p.iterdir()
+        Parameters
+        ----------
+        directory : str or Path
+            The directory whose contents are added as shortcuts.
+        overwrite : bool, optional
+            Whether to overwrite existing shortcuts. Default is False.
+        prefix : str, optional
+            Prefix prepended to every shortcut name. Default is ``""``.
+        only_include : list or None, optional
+            Glob patterns; only entries matching at least one pattern are added.
+            ``None`` (default) disables this filter.
+        only_exclude : list or None, optional
+            Glob patterns; entries matching any pattern are skipped.
+            ``None`` (default) disables this filter.
+        only_folders : bool, optional
+            When True, skip files and add only directories. Default is False.
+        only_files : bool, optional
+            When True, skip directories and add only files. Default is False.
 
-            for entry in generator:
-                entry_name = entry.name
-                if entry.is_dir() and not only_files:
-                    shortcut_name = prefix + entry_name
-                    self.add(shortcut_name, str(entry), overwrite=overwrite)
-                elif entry.is_file() and not only_folders:
-                    shortcut_name = prefix + entry_name
-                    self.add(shortcut_name, str(entry), overwrite=overwrite)
+        Examples
+        --------
+        >>> shortcut = Shortcut()
+        >>> shortcut.add_all("/path/to/directory")
+        """
+        p = Path(directory).absolute()
+        if not p.is_dir():
+            raise NotADirectoryError(f"{directory} is not a valid directory")
+
+        # Build the generator: apply include filter first, then exclude filter
+        if only_include:
+            generator = chain.from_iterable(p.glob(pattern) for pattern in only_include)
+        else:
+            generator = p.iterdir()
+        if only_exclude:
+            generator = (e for e in generator
+                         if not any(e.match(pat) for pat in only_exclude))
+
+        for entry in generator:
+            entry_name = entry.name
+            if entry.is_dir() and not only_files:
+                self.add(prefix + entry_name, str(entry), overwrite=overwrite)
+            elif entry.is_file() and not only_folders:
+                self.add(prefix + entry_name, str(entry), overwrite=overwrite)
 
     def get(self, name: str) -> str:
         """
@@ -397,10 +372,8 @@ class Shortcut(Base):
         >>> shortcut = Shortcut()
         >>> shortcut.load_dict({"project": "/path/to/project", "data": "/path/to/data"})
         """
-        _pn_converter = self._pn_converter
         for name, path in data.items():
-            valid_name = _pn_converter.to_valid_name(name)
-            self.add(valid_name, Path(path), overwrite=overwrite)
+            self.add(name, path, overwrite=overwrite)
 
     def load_json(self, filename: str, overwrite: bool = False):
         """

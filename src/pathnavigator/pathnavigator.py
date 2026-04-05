@@ -1,3 +1,10 @@
+"""
+PathNavigator root class.
+
+PathNavigator is the main entry point for the library. It extends Folder
+with root-level initialisation and owns a Shortcut manager (``pn.sc``).
+"""
+
 import sys
 from pathlib import Path
 from .folder import Folder
@@ -30,8 +37,8 @@ class PathNavigator(Folder):
     >>> pn.folder1.add_to_sys_path()    # add folder1 to the system path.
     
     >>> pn.exists('folder1')    # check if folder1 exists in the folder structure.
-    >>> pn.folder1.listdirs()   # returns a list of subfolders in folder1.
-    >>> pn.folder1.listfiles()  # returns a list of files in folder1.
+    >>> pn.folder1.list(entry_type='folder')  # returns a list of subfolders in folder1.
+    >>> pn.folder1.list(entry_type='file')    # returns a list of files in folder1.
 
     >>> pn.mkdir('folder1', 'folder2')  # make a subfolder under the root. In this case, 'root/folder1/folder2' will be created.
     >>> pn.remove('folder1')    # removes a file or subfolder from the folder and deletes it from the filesystem.
@@ -100,14 +107,13 @@ class PathNavigator(Folder):
         super().__init__(name=self._pn_root.name, parent_path=self._pn_root.parent, _pn_object=self)
         
         self.scan(
-             max_depth=max_depth, 
+             max_depth=max_depth,
              only_include=only_include, only_exclude=only_exclude,
              only_folders=only_folders, only_files=only_files,
              clear=True,
              max_files=max_files, max_folders=max_folders,
              recursive_include_and_exclude=recursive_include_and_exclude,
-             include_hidden=include_hidden,
-             _depth_count=0)
+             include_hidden=include_hidden)
 
     def __str__(self):
         return str(self._pn_root)

@@ -1,45 +1,49 @@
-pathnavigator package
-=====================
+pathnavigator
+=============
 
-Submodules
-----------
-
-pathnavigator.att\_name\_convertor module
------------------------------------------
-
-.. automodule:: pathnavigator.att_name_convertor
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-pathnavigator.folder module
----------------------------
-
-.. automodule:: pathnavigator.folder
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-pathnavigator.pathnavigator module
-----------------------------------
-
-.. automodule:: pathnavigator.pathnavigator
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-pathnavigator.shortcut module
------------------------------
-
-.. automodule:: pathnavigator.shortcut
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
+Top-level helpers
+-----------------
 
 .. automodule:: pathnavigator
    :members:
-   :undoc-members:
+   :no-undoc-members:
    :show-inheritance:
+
+----
+
+.. _folder-class:
+
+Folder
+------
+
+.. autoclass:: pathnavigator.folder.Folder
+   :members:
+   :no-undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
+----
+
+.. _pathnavigator-class:
+
+PathNavigator
+-------------
+
+.. autoclass:: pathnavigator.pathnavigator.PathNavigator
+   :members:
+   :no-undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
+----
+
+.. _shortcut-class:
+
+Shortcut
+--------
+
+.. autoclass:: pathnavigator.shortcut.Shortcut
+   :members:
+   :no-undoc-members:
+   :show-inheritance:
+   :member-order: bysource

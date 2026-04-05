@@ -1,172 +1,189 @@
 [![PyPI](https://img.shields.io/pypi/v/pathnavigator)](https://pypi.org/project/pathnavigator/)
+[![Python](https://img.shields.io/pypi/pyversions/pathnavigator)](https://pypi.org/project/pathnavigator/)
 [![Docs](https://github.com/philip928lin/PathNavigator/actions/workflows/docs.yml/badge.svg)](https://philip928lin.github.io/PathNavigator/)
-![Test](https://github.com/philip928lin/PathNavigator/actions/workflows/test.yml/badge.svg)
+[![Test](https://github.com/philip928lin/PathNavigator/actions/workflows/test.yml/badge.svg)](https://github.com/philip928lin/PathNavigator/actions/workflows/test.yml)
 
 # PathNavigator
 
-`PathNavigator` is a Python package designed to navigate directories and files. It provides tools to interact with the filesystem, allowing users to create, delete, and navigate folders and files, while also maintaining an internal representation of the directory structure. Customized shortcuts can be added. The paths are stored as `Path` objects from [`pathlib`](https://docs.python.org/3/library/pathlib.html), which adapt automatically across platforms. 
-
+**PathNavigator** is a Python library for intuitive filesystem navigation. It lets you access directories and files as attributes, manage named shortcuts for frequently used paths, and perform common filesystem operations — all through a consistent, platform-independent API built on [`pathlib`](https://docs.python.org/3/library/pathlib.html).
 
 ## Installation
 
 ```bash
-pip install PathNavigator
+pip install pathnavigator
 ```
 
-Install the latest version from the GitHub repo:
+Install the latest development version:
 ```bash
 pip install git+https://github.com/philip928lin/PathNavigator.git
 ```
 
-## Getting Started
+## Quick Start
 
 ```python
 import pathnavigator
 
-# Initialize PathNavigator
-pn = pathnavigator.create("root_dir")
+# Initialize with a root directory (defaults to cwd if omitted)
+pn = pathnavigator.create("/path/to/project")
 
 # Retrieve paths
-pn.folder1.get()        # Full path as a Path object
-pn.folder1.get_str()    # Full path as a string
-pn.folder1.get("file.txt")  # Path to a file
+pn.folder1.get()              # full path as a Path object
+pn.folder1.get_str()          # full path as a string
+pn.folder1.get("file.txt")    # path to a specific file
 
 # Manage shortcuts
-pn.folder1.set_sc("my_folder")  # Shortcut for folder1
-pn.folder1.set_sc("my_file", "file.txt")  # Shortcut for file.txt
-pn.sc.get("my_file")  # Retrieve shortcut
+pn.folder1.set_sc("f1")               # bookmark folder1 as "f1"
+pn.folder1.set_sc("cfg", "conf.yaml") # bookmark a file
+pn.sc.get("f1")                        # retrieve bookmark as Path
+pn.sc.get_str("cfg")                   # retrieve bookmark as string
 
 # Directory operations
-pn.folder1.mkdir("subfolder")  # Create subfolder
-pn.folder1.remove("subfolder")  # Delete subfolder
-pn.folder1.exists("file.txt")  # Check existence
+pn.folder1.mkdir("subfolder")          # create a subdirectory
+pn.folder1.remove("subfolder")         # delete a file or folder
+pn.folder1.exists("file.txt")          # check existence
 
 # List contents
-pn.folder1.list(type="folder")  # List subfolders
-pn.folder1.list(type="file")    # List files
+pn.folder1.list(entry_type="folder")   # list subfolders
+pn.folder1.list(entry_type="file")     # list files
 
-# Visualize structure
-pn.tree()  # Print directory tree that has been scanned by pathnavigator
+# Visualize the scanned structure
+pn.tree()
 ```
 
 ## Features
-- Path Retrieval: Access full paths as Path objects or strings.
-- Directory Management: Create, delete, and check existence of files/folders.
-- Shortcuts: Add, retrieve, and manage shortcuts for quick access. Save or load existed shortcut configuration.
-- Customized Folder Scan and List: Scan or list files or subfolders with filtering options.
-- Tree Visualization: Print a visual representation of the directory structure.
-- Built-in User and OS Info: Automatically detect username and operation system.
-- System Path Management: Add directories to sys.path.
-- Change Directory: Set a folder as the working directory.
 
-### Directory and File Operations
+- **Attribute-style navigation** — access subfolders as `pn.folder1.subfolder2`
+- **Path retrieval** — get `Path` objects or strings via `get()` / `get_str()`
+- **Directory management** — create, delete, check existence, and change directory
+- **Shortcuts** — bookmark frequently used paths and persist them as JSON or YAML
+- **Flexible scanning** — filter by name pattern, depth, file/folder type, or hidden status
+- **Tree visualization** — print an ASCII tree of the scanned structure
+- **System path management** — add directories to `sys.path`
+- **Cross-platform** — works on macOS, Linux, and Windows; uses `pathlib` throughout
+- **Built-in helpers** — `pathnavigator.user` (current username), `pathnavigator.os_name` (OS name), `pathnavigator.expanduser`
+
+---
+
+## Directory and File Operations
+
 ```python
-# Returns the full path to folder1.
-pn.folder1.get()        # Return a Path object
-pn.folder1.get_str()    # Return a string
+# Get the full path of folder1
+pn.folder1.get()        # Path object
+pn.folder1.get_str()    # string
 
-# Return the full path to file1.
-pn.get("folder1/file.csv")      # Return a Path object
-pn.folder1.get_str("file.csv")  # Return a string
+# Get the path of a specific file
+pn.get("folder1/file.csv")       # Path object
+pn.folder1.get_str("file.csv")   # string
 
-# Rrints the contents (subfolders and files) of folder1.
-pn.folder1.ls()         
+# Print the contents (subfolders and files) of folder1
+pn.folder1.ls()
 
-# Make the nested directories.
-# Directory root/folder1/subfolder1/subsubfolder2 will be created
-pn.folder1.mkdir("subfolder1/subsubfolder2")
+# Create nested directories: root/folder1/sub/deep will be created
+pn.folder1.mkdir("sub/deep")
 
-# Removes a file or a folder and deletes it from the filesystem including all nested items.
-# The following code will delete the directory of root/folder1/folder2
-pn.folder1.remove('folder2')    
+# Delete a file or folder (including all nested items)
+pn.folder1.remove("sub")
 
-# Combine folder1 directory with "subfolder1/fileX.txt" and return it.
-pn.folder1.join("subfolder1", "fileX.txt") 
+# Join paths without navigating into a subfolder
+pn.folder1.join("sub", "fileX.txt")
 
-# Or, you can utilize Path feature to join the paths.
-pn.folder1.get() / "subfolder1/fileX.txt"
+# Or use pathlib's / operator
+pn.folder1.get() / "sub" / "fileX.txt"
 ```
 
-### Check the existence of a file or subfolder
+### Check existence
+
 ```python
-pn.folder1.exists("fileX.txt")
-pn.folder1.exists("subfolder")
+pn.folder1.exists("file.txt")   # True / False
+pn.folder1.exists("subfolder")  # True / False
 ```
 
-### System Path Management
+### Scan the directory tree
+
 ```python
-# Add the directory to folder1 to sys path.
-pn.forlder1.add_to_sys_path()   
+# Scan up to 2 levels deep (folders only by default)
+pn.scan(max_depth=2)
+
+# Include files in the scan
+pn.scan(max_depth=1, only_folders=False)
+
+# Filter by name pattern (fnmatch, no ** wildcard)
+pn.scan(max_depth=2, only_include=["data_*", "*.csv"])
+pn.scan(max_depth=1, only_exclude=[".*", "__pycache__"])
+
+# Include hidden files and folders (dot-files on Unix; also
+# FILE_ATTRIBUTE_HIDDEN entries on Windows)
+pn.scan(max_depth=1, include_hidden=True)
 ```
 
-### Changing Directories
+### List contents
+
 ```python
-# Change the working directory to folder2.
-pn.forlder1.forlder2.chdir()    
+pn.folder1.list()                        # names of all entries (default)
+pn.folder1.list(entry_type="folder")     # subfolder names only
+pn.folder1.list(entry_type="file")       # file names only
+pn.folder1.list(mode="dir")              # full Path objects
+pn.folder1.list(mode="stem")             # file stems (no extension)
 ```
 
-### Listing folders or files
+### System path and working directory
+
 ```python
-# List all directories
-pn.forlder1.list()
-# List all subfolders
-pn.forlder1.list(type="folder")
-# List all files
-pn.forlder1.list(type="file")
+# Add folder1 to sys.path (inserts a string, not a Path object)
+pn.folder1.add_to_sys_path()
+pn.folder1.add_to_sys_path(method="append")
+
+# Change the working directory to subfolder1
+pn.folder1.subfolder1.chdir()
 ```
 
-### Shortcuts Management
-#### Add shortcuts
+---
+
+## Shortcuts
+
+### Add shortcuts
+
 ```python
-# Set a shortcut named "f1" to folder1.
-# Can be accessed by pn.sc.f1 or pn.sc.get("f1") or pn.sc.get_str("f1").
+# Bookmark folder1 as "f1" — accessible as pn.sc.f1
 pn.folder1.set_sc("f1")
 
-# Set a shortcut named "x" to the file "x.txt" in folder1.
-# Can be accessed by pn.sc.x or pn.sc.get("x") or pn.sc.get_str("x").
-pn.folder1.set_sc("x", "x.txt")
-pn.folder1.set_all_files_to_sc() # set all files in the current directory to shortcuts
+# Bookmark a specific file
+pn.folder1.set_sc("cfg", "config.yaml")
 
-# Directly add shortcuts in pn.sc
-pn.sc.add('f', pn.folder1.get("file"))  
-pn.sc.add('f', r"new/path")  
-pn.sc.add_all_files(directory=pn.folder1.get())
+# Add all entries in folder1 as shortcuts
+pn.folder1.set_all_to_sc()
+pn.folder1.set_all_to_sc(only_files=True)
+pn.folder1.set_all_to_sc(only_folders=True, prefix="dir_")
+
+# Add shortcuts directly via the Shortcut manager
+pn.sc.add("raw", pn.folder1.get("raw_data.csv"))
+pn.sc.add_all(directory=pn.folder1.get(), only_files=True)
 ```
 
-#### Retrieve shortcuts
+### Retrieve shortcuts
+
 ```python
-# Retrieve the path of "f1" shortcut
-pn.sc.f1
-pn.sc.get("f1")  
-pn.sc.get_str("f1") 
+pn.sc.f1            # Path object via attribute access
+pn.sc.get("f1")     # Path object via method
+pn.sc.get_str("f1") # string via method
 ```
 
-#### Other shortcut operations
+### Manage shortcuts
+
 ```python
-# Print all shortcuts
-pn.sc.ls()       
-
-# Remove a shortcut
-pn.sc.remove('f')   
-
-# Return a dictionary of shortcuts
-pn.sc.to_dict()  
-
-# Output of shortcuts json file
-pn.sc.to_json(filename)  
-
-# Output of shortcuts yaml file
-pn.sc.to_yaml(filename)
-
-# Load shortcuts from a dictionary
-pn.sc.load_dict()  
-
-# Load shortcuts from a json file
-pn.sc.load_json(filename)  
-
-# Load shortcuts from a yaml file
-pn.sc.load_yaml(filename)  
+pn.sc.ls()                    # print all shortcuts
+pn.sc.remove("f1")            # delete a shortcut
+pn.sc.clear()                 # delete all shortcuts
+pn.sc.to_dict()               # return as dict
+pn.sc.to_json("sc.json")      # save to JSON
+pn.sc.to_yaml("sc.yaml")      # save to YAML
+pn.sc.load_dict({"f1": "/path/to/folder1"})
+pn.sc.load_json("sc.json")
+pn.sc.load_yaml("sc.yaml")
 ```
 
-## API reference
-[![Docs](https://github.com/philip928lin/PathNavigator/actions/workflows/docs.yml/badge.svg)](https://philip928lin.github.io/PathNavigator/)
+---
+
+## API Reference
+
+Full API documentation is available at **[philip928lin.github.io/PathNavigator](https://philip928lin.github.io/PathNavigator/)**.

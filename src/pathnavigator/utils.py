@@ -1,3 +1,11 @@
+"""
+Base utilities for PathNavigator classes.
+
+Provides the Base class which supplies a ``help()`` class method for
+displaying available public methods and their docstrings.
+"""
+
+
 class Base:
     @classmethod
     def help(cls, method_name=None, show_doc=True):
@@ -28,7 +36,8 @@ class Base:
         else:
             # Display all methods in the class
             for method_name in dir(cls):
-                if callable(getattr(cls, method_name)) and not method_name.startswith("__"):
+                if (callable(getattr(cls, method_name))
+                        and not method_name.startswith("_")):
                     method = getattr(cls, method_name)
                     if show_doc:
                         print(f"{method_name}:\n{method.__doc__}\n")

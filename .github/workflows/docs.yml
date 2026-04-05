@@ -5,38 +5,56 @@ on:
     branches:
       - main
 
+# Cancel any in-progress run for the same branch so only the latest is built
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Install dependencies
-      run: |
-        pip install sphinx sphinx_rtd_theme sphinx-autodoc-typehints
+      - name: Install documentation dependencies
+        run: |
+          pip install \
+            sphinx \
+            furo \
+            sphinx-autodoc-typehints \
+            sphinx-copybutton \
+            myst-parser
 
-    - name: Install pathnavigator
-      run: |
-        pip install .
+      - name: Install pathnavigator
+        run: pip install .
 
-    - name: Generate API documentation
-      run: |
-        sphinx-apidoc -o docs/source/ src/pathnavigator
+      - name: Generate API stubs
+        run: |
+          sphinx-apidoc \
+            --force \
+            --separate \
+            --module-first \
+            -o docs/source/ \
+            src/pathnavigator
 
-    - name: Build documentation
-      run: |
-        cd docs
-        make html
+      - name: Build HTML documentation
+        run: |
+          cd docs
+          make html SPHINXOPTS="-W --keep-going -n"
 
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GH_PAT }}
-        publish_dir: ./docs/_build/html
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/_build/html
+          force_orphan: true

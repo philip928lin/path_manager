@@ -1,3 +1,11 @@
+"""
+Attribute name converter for PathNavigator.
+
+Converts arbitrary filesystem names (which may contain spaces, special
+characters, or Python keywords) to valid Python identifiers and maintains
+bidirectional mappings so original names can always be recovered.
+"""
+
 import re
 import keyword
 from dataclasses import dataclass, field
@@ -21,11 +29,11 @@ class AttributeNameConverter(Base):
     _pn_valid_name_to_org: dict = field(default_factory=dict)
     _pn_invalid_name_list: list = field(
         default_factory=lambda: [
-            "root_dir", "sc", "reload", "ls", "remove", "join", "mkdir", "exists", 
-            "set_sc", "set_all_files_to_sc", "get", "get_str",
-            "listdirs", "listfiles", "chdir", "add_to_sys_path", "tree"
+            "root_dir", "sc", "ls", "remove", "join", "mkdir", "exists",
+            "set_sc", "set_all_to_sc", "get", "get_str",
+            "listdirs", "listfiles", "chdir", "add_to_sys_path", "tree",
             "name", "parent_path", "subfolders", "files"]
-        ) # Folder & PathNavigator methods and attributes
+        )  # Reserved Folder & PathNavigator method and attribute names
 
     def to_valid_name(self, name: str) -> str:
         """
@@ -98,7 +106,7 @@ class AttributeNameConverter(Base):
             raise ValueError(f"Strings starting with '_pn_' are reserved in PathNavigator. Please modify '{name}' to eligible naming.")
         if name in invalid_name_list:
             raise ValueError(f"Please avoid using reserved names and follow the naming conventions. Reserved names {invalid_name_list}")
-        return name.isidentifier() and not keyword.iskeyword(name) and not name in invalid_name_list
+        return name.isidentifier() and not keyword.iskeyword(name)
 
     def _pn_convert_to_valid_attribute_name(self, name: str) -> str:
         """

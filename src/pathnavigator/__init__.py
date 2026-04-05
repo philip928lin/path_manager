@@ -1,3 +1,19 @@
+"""
+PathNavigator — intuitive filesystem navigation for Python.
+
+Quickstart::
+
+    import pathnavigator as pn
+    nav = pn.create('/path/to/root')
+    nav.folder1.get()          # Path object
+    nav.folder1.get_str()      # string path
+    nav.folder1.set_sc('f1')   # bookmark folder1
+    nav.sc.f1                  # retrieve bookmark
+
+Public API re-exported from sub-modules:
+    PathNavigator, Folder, Shortcut, create
+"""
+
 import os
 import sys
 import getpass
@@ -70,11 +86,7 @@ def create(
         display=display
         )
 
-# Other info 
-user = getpass.getuser()
-os_name = platform.system()
-#'Windows' for Windows
-#'Linux' for Linux
-#'Darwin' for macOS
-
-expanduser = os.path.expanduser # Easy access to the expanduser function
+# Convenience helpers available at the top-level namespace
+user = getpass.getuser()          # current OS user name
+os_name = platform.system()       # 'Windows', 'Linux', or 'Darwin' (macOS)
+expanduser = os.path.expanduser   # shortcut for home-directory expansion
